@@ -1,48 +1,48 @@
 name: CI Pipeline
 
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-        branches:
-            - main
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-    build-and-test:
-        runs-on: ubuntu-latest
-        
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v3
-            
-            - name: Setup Docker
-              uses: docker/setup-buildx-action@v2
-              with:
-                driver: docker-container
+  build-and-test:
+    runs-on: ubuntu-latest
 
-            - name: Cache Docker Layers
-              uses: actions/cache@v3
-              with:
-                path: /tmp/.buildx-cache
-                key: ${{ runner.os }}-buildx-${{ github.sha}}
-                restore-keys: |
-                    ${{ runner.os }}-buildx-
-            
-            - name: Install Docker Compose V2
-              run: |
-                mkdir -p $HOME/.docker/cli-plugins
-                curl -SL https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-x86_64 -o $HOME/.docker/cli-plugins/docker-compose
-                chmod +x $HOME/.docker/cli-plugins/docker-compose
-                docker version
-                docker compose version
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-            - name: Build Docker Image
-              run: |
-                docker build --cache-from=type=local,src=/tmp/.buildx-cache \
-                            --cache-to=type=local,dest=/tmp/.buildx-cache \
-                            -t nova .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          driver: docker-container  # ✅ Ensure Buildx uses the correct driver
+          driver-opts: network=host
+
+      - name: Create and Use a Buildx Builder
+        run: |
+          docker buildx create --name mybuilder --use --driver docker-container
+          docker buildx inspect --bootstrap
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-docker-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      - name: Build Docker Image with Caching
+        run: |
+          docker buildx build --builder mybuilder \
+                              --cache-from=type=local,src=/tmp/.buildx-cache \
+                              --cache-to=type=local,dest=/tmp/.buildx-cache,mode=max \
+                              -t nova .
+
             
-            - name: Run Tests Inside Docker
-              run: |
-                docker run --rm nova python manage.py test
+      - name: Run Tests Inside Docker
+        run: |
+         docker run --rm nova python manage.py test
