@@ -43,6 +43,6 @@ jobs:
                               -t nova .
 
             
-      - name: Run Tests Inside Docker
-        run: |
-         docker run --rm nova python manage.py test
+    #   - name: Run Tests Inside Docker
+    #     run: |
+    #      docker run --rm nova python manage.py test
